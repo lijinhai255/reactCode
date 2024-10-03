@@ -1,15 +1,16 @@
 let nextUnitOfWork = null;
-
+let wipRoot = null;
 export function render(element, container) {
   // memo 是不是整个fiber tree 进行优化
 
   // 将我们的跟节点设置成为第一个工作单位
-  nextUnitOfWork = {
+  wipRoot = {
     dom: container,
     props: {
       children: [element],
     },
   };
+  nextUnitOfWork = wipRoot;
 }
 
 export function createDome(fiber) {
@@ -32,6 +33,37 @@ export function createDome(fiber) {
   //     下一个工作单元 = 执行工作单元(下一个工作单元丢进去)
   // }
 }
+/**
+ * 处理提交的fiber树
+ * @param {*} fiber
+ * @returns
+ * **/
+function commitWork(fiber) {
+  //   wipRoot = null;
+  if (!fiber) {
+    return;
+  }
+  //   //找到最近的有dom的祖先节点
+  //   let dowParentFiber = fiber.parent;
+  //   while (!dowParentFiber.dom) {
+  //     dowParentFiber = dowParentFiber.parent;
+  //   }
+  //   // 将fiber的dom添加到父节点上
+  //   dowParentFiber.dom.appendChild(fiber.dom);
+  const domParent = fiber.parent.dom;
+  domParent.appendChild(fiber.dom);
+  // 递归
+  commitWork(fiber.child);
+  commitWork(fiber.sibling);
+}
+/**
+ * 提交任务，将Fiber tree 渲染为真实DOM
+ * **/
+function commitRoot() {
+  commitWork(wipRoot.child);
+  wipRoot = null;
+}
+
 /***
  * 工作循环
  *
@@ -42,13 +74,15 @@ function workloop(deadline) {
   while (nextUnitOfWork && !shouldYield) {
     // 执行工作单元
     nextUnitOfWork = performUnitOfWork(nextUnitOfWork);
-    console.log(nextUnitOfWork, "nextUnitOfWork-nextUnitOfWork");
     // 判断是否需要停止
     // 模拟的情况是咱们自己还得判断下有没有16.67
     shouldYield = deadline.timeRemaining() < 1;
   }
+  if (!nextUnitOfWork && wipRoot) {
+    commitRoot();
+  }
+  requestIdleCallback(workloop);
 }
-
 requestIdleCallback(workloop);
 
 function performUnitOfWork(fiber) {
