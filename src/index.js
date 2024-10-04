@@ -23,11 +23,12 @@
 
 // const container = document.getElementById("root");
 // React.render(element, container);
+import React from "../react"; // 假设你有一个自定义 React 实现
 
-import React from "../react";
 const container = document.getElementById("root");
 
 const updateValue = (e) => {
+  console.log(e.target.value, "e.target.value");
   rerender(e.target.value);
 };
 
@@ -35,10 +36,10 @@ const rerender = (value) => {
   const element = (
     <div>
       <input onInput={updateValue} value={value} />
-      <h2>Hellow {value}</h2>
+      <h2>Hello {value}</h2>
     </div>
   );
-  React.render(element, container);
+  React.render(element, container); // 重新渲染整个树
 };
 
 rerender("world");
