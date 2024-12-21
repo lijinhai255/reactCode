@@ -95,7 +95,11 @@ function commitWork(fiber) {
     return;
   }
 
-  const domParent = fiber.parent.dom;
+  let domParentFiber = fiber.parent;
+  while (!domParentFiber.dom) {
+    domParentFiber = domParentFiber.parent;
+  }
+  const domParent = domParentFiber.dom;
 
   if (fiber.effectTag === "PLACEMENT" && fiber.dom != null) {
     domParent.appendChild(fiber.dom);
@@ -209,11 +213,15 @@ function reconcileChildren(wipFiber, elements) {
     index++;
   }
 }
-
-/**
- * 执行工作单元的主要逻辑
- **/
-function performUnitOfWork(fiber) {
+function updateFunctionComponent(fiber) {
+  wipFiber = fiber;
+  hookIndex = 0;
+  // 随着当前的函数组件
+  wipFiber.hooks = [];
+  const children = [fiber.type(fiber.props)];
+  reconcileChildren(fiber, children);
+}
+function updateHostComponent(fiber) {
   if (!fiber.dom) {
     // 如果没有创建 DOM 节点，则创建
     fiber.dom = createDome(fiber);
@@ -222,6 +230,50 @@ function performUnitOfWork(fiber) {
 
   const elements = fiber.props.children;
   reconcileChildren(fiber, elements); // 协调子节点
+}
+let wipFiber = null;
+let hookIndex = null;
+export function useState(initial) {
+  // 检查是否有酒的hooks
+  const oldHook =
+    wipFiber.alternate &&
+    wipFiber.alternate.hooks &&
+    wipFiber.alternate.hooks[hookIndex];
+  console.log(oldHook, "oldHook");
+  const hook = {
+    state: oldHook ? oldHook.state : initial,
+    queue: [],
+  };
+  const actions = oldHook ? oldHook.queue : [];
+  actions.forEach((action) => {
+    hook.state = typeof action === "function" ? action(hook.state) : action;
+  });
+  const setState = (action) => {
+    hook.queue.push(action);
+    wipRoot = {
+      dom: currentRoot.dom,
+      props: currentRoot.props,
+      alternate: currentRoot,
+    };
+    nextUnitOfWork = wipRoot;
+    deletions = [];
+  };
+  wipFiber.hooks.push(hook);
+  hookIndex++;
+  return [hook.state, setState];
+}
+/**
+ * 执行工作单元的主要逻辑
+ **/
+function performUnitOfWork(fiber) {
+  // 判断是否是函数组件
+  const isFunctionComponent = fiber.type instanceof Function;
+  if (isFunctionComponent) {
+    // 更新函数组件
+    updateFunctionComponent(fiber);
+  } else {
+    updateHostComponent(fiber);
+  }
 
   if (fiber.child) {
     return fiber.child; // 如果有子节点，继续处理子节点
